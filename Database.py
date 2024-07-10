@@ -5,15 +5,20 @@ from random import random
 
 connection = sqlite3.connect("users.db")
 cursor = connection.cursor()
-cursor.execute("CREATE TABLE IF NOT EXISTS cooldown(id INT PRIMARY KEY, last_daily TEXT, last_quest TEXT )")
-cursor.execute("CREATE TABLE IF NOT EXISTS quests(id INT PRIMARY KEY,quest1 TEXT, quest2 TEXT, quest3 TEXT)")
-cursor.execute("CREATE TABLE IF NOT EXISTS users(id INT PRIMARY KEY, points INT)")
 
-houseId = 594126960926523408
+secertFile = open("config.json")
+fileData = json.load(secertFile)
+
+houseId = fileData["house_id"]
 
 format = "%Y-%d-%m"
 
 default_date = datetime.datetime(2024,1,1).strftime(format)
+
+def createRepository():
+    cursor.execute("CREATE TABLE IF NOT EXISTS cooldown(id INT PRIMARY KEY, last_daily TEXT, last_quest TEXT )")
+    cursor.execute("CREATE TABLE IF NOT EXISTS quests(id INT PRIMARY KEY,quest1 TEXT, quest2 TEXT, quest3 TEXT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS users(id INT PRIMARY KEY, points INT)")
 
 def resetDailyCooldown(id:int):
     date = datetime.datetime.today.strftime(format)
