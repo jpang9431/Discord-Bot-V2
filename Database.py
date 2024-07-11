@@ -1,7 +1,7 @@
 import sqlite3
 import datetime
 import json
-from random import random 
+import random 
 
 connection = sqlite3.connect("users.db")
 cursor = connection.cursor()
@@ -25,12 +25,12 @@ def resetDailyCooldown(id:int):
     cursor.execute("UPDATE cooldown SET last_daily=? WHERE id=?",(date,id))
     connection.commit()
 
-def checkDailyCooldown(id:int):
+async def checkDailyCooldown(id:int):
     cursor.execute("SELECT last_daily FROM cooldown WHERE id=?",(id,))
     timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone(), format)).days
     return timeDifference>=1
 
-def checkQuestCooldown(id:int):
+async def checkQuestCooldown(id:int):
     cursor.execute("SELECT last_quest FROM cooldown WHERE id=?",(id,))
     timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone(), format)).days
     return timeDifference>=1
@@ -48,22 +48,23 @@ def updateQuests(id:int, quest_id:int):
         if (quest_dict["id"] == quest_id):
             quest_dict.update(progress=quest_dict["progress"]+1)
             quests[i] = json.dump(quest_dict)
-    cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ?",(quests))
+    cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests[0],quests[1],quests[2],id))
     connection.commit()
     
 def getNewQuest():
-    goal = random.randint(0,5)
+    goal = random.randint(1,5)
+    print(goal)
     quest = {
         "id" : random.randint(0,2),
         "progress" : 0,
         "goal" : goal,
-        "points" : goal*random.randint(1,4)
+        "points" : goal*random.randint(1,5)
     }
     return json.dumps(quest)
 
-def getQuests(id:int):
+async def getQuests(id:int):
     cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
-    quests = cursor.fetchone()
+    quests = list(cursor.fetchone())
     for i in range(len(quests)):
         quest_dict = json.loads(quests[i])
         quests[i] = quest_dict
@@ -73,6 +74,14 @@ def resetQuests(id:int):
     cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(getNewQuest(),getNewQuest(),getNewQuest(),id))
     connection.commit()
 
+def setNewQuets(id:int):
+    cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
+    quests = cursor.fetchone()
+    for i in range(len(quests)):
+        if (quests[i]=="None"):
+            quests[i] = getNewQuest()
+    cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests[0],quests[1],quests[2],id))
+            
 def claimQuests(id:int):
     cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
     quests = cursor.fetchone()
@@ -81,8 +90,8 @@ def claimQuests(id:int):
         quest_dict = json.loads(quests[i])
         if (quest_dict["progress"]>=quest_dict["goal"]):
             total_points+=quest_dict["points"]
-            quests[i] = getNewQuest()
-    cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests,id))
+            quests[i] = "None"
+    cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests[0],quests[1],quests[2],id))
     connection.commit()
     return total_points
 
@@ -94,7 +103,7 @@ def insertNewUserIfNotExists(id:int):
         cursor.execute("INSERT INTO quests VALUES(?,?,?,?)",(id,getNewQuest(),getNewQuest(),getNewQuest()))
         connection.commit()
 
-def getPoints(id:int):
+async def getPoints(id:int):
     cursor.execute("SELECT points FROM users WHERE id=?",(id,))
     return cursor.fetchone()
 
