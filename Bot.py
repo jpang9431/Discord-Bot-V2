@@ -3,6 +3,7 @@ import Database as db
 from Bot_Ui import editMenu
 from Bot_Ui import editQuest
 from Bot_Ui import editCoinFlip
+from Bot_Ui import editDaily
 import discord
 from discord.ext import commands
 from discord.ui import View
@@ -21,9 +22,8 @@ async def on_ready():
 
 async def add_guild(guild):
     for user in guild.members:
-        print(user)
         if not user.bot:
-            db.insertNewUserIfNotExists(user.id)
+            await db.insertNewUserIfNotExists(user.id)
         
 @client.event
 async def on_guild_join(guild):
@@ -37,7 +37,7 @@ async def add_new_users(interaction:discord.Interaction):
 @client.tree.command(name="quest", description="Check/Claim quest progress and get new quests")
 async def quest(interaction:discord.Interaction):
     userId = interaction.user.id
-    db.insertNewUserIfNotExists(userId)
+    await db.insertNewUserIfNotExists(userId)
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
@@ -47,7 +47,7 @@ async def quest(interaction:discord.Interaction):
 @client.tree.command(name="menu", description="View the menu of options")
 async def menu(interaction:discord.Interaction):
     userId = interaction.user.id
-    db.insertNewUserIfNotExists(userId)
+    await db.insertNewUserIfNotExists(userId)
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
@@ -58,11 +58,20 @@ async def menu(interaction:discord.Interaction):
 @app_commands.describe(bet="The amount you want to be must be >=0 and <= the number of points you have, if the bet is out of range it goes to the default of 0")
 async def coin_flip(interaction:discord.Interaction, bet:int):
     userId = interaction.user.id
-    db.insertNewUserIfNotExists(userId)
+    await db.insertNewUserIfNotExists(userId)
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
     await editCoinFlip(view, embed, user, interaction, bet)
+    await interaction.response.send_message(embed=embed, view=view)
+
+@client.tree.command(name="daily", description="Claim daily reward")
+async def daily(interaction:discord.Interaction):
+    user = interaction.user
+    await db.insertNewUserIfNotExists(user.id)
+    embed = discord.Embed(title=user.display_name, color = user.color)
+    view = View()
+    await editDaily(view, embed, user, interaction)
     await interaction.response.send_message(embed=embed, view=view)
 
 client.run(token)

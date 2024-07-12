@@ -1,4 +1,5 @@
 users.db
 config.json
 __pychace__
-Outputs/__pycache__
+__pycache__/Bot_Ui.cpython-312.pyc
+__pycache__/Database.cpython-312.pyc

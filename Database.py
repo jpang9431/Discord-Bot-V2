@@ -21,8 +21,8 @@ def createRepository():
     cursor.execute("CREATE TABLE IF NOT EXISTS quests(id INT PRIMARY KEY,quest1 TEXT, quest2 TEXT, quest3 TEXT)")
     cursor.execute("CREATE TABLE IF NOT EXISTS users(id INT PRIMARY KEY, points INT)")
 
-def resetDailyCooldown(id:int):
-    date = datetime.datetime.today.strftime(format)
+async def resetDailyCooldown(id:int):
+    date = datetime.datetime.today().strftime(format)
     cursor.execute("UPDATE cooldown SET last_daily=? WHERE id=?",(date,id))
     connection.commit()
 
@@ -36,12 +36,12 @@ async def checkQuestCooldown(id:int):
     timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone()[0], format)).days
     return timeDifference>=1
 
-def resetQuestCooldown(id:int):
+async def resetQuestCooldown(id:int):
     date = datetime.datetime.today().strftime(format)
     cursor.execute("UPDATE cooldown SET last_quest=? WHERE id=?",(date,id))
     connection.commit()
     
-def updateQuests(id:int, quest_id:int):
+async def updateQuests(id:int, quest_id:int):
     cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
     quests = cursor.fetchone()
     for i in range(len(quests)):
@@ -54,7 +54,6 @@ def updateQuests(id:int, quest_id:int):
     
 def getNewQuest():
     goal = random.randint(1,5)
-    print(goal)
     quest = {
         "id" : random.randint(0,2),
         "progress" : 0,
@@ -71,7 +70,7 @@ async def getQuests(id:int):
         quests[i] = quest_dict
     return quests
 
-def resetQuests(id:int):
+async def resetQuests(id:int):
     cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(getNewQuest(),getNewQuest(),getNewQuest(),id))
     connection.commit()
 
@@ -84,7 +83,7 @@ async def setNewQuets(id:int):
             quests[i] = getNewQuest()
     cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests[0],quests[1],quests[2],id))
             
-def claimQuests(id:int):
+async def claimQuests(id:int):
     cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
     quests = cursor.fetchone()
     total_points = 0
@@ -97,7 +96,7 @@ def claimQuests(id:int):
     connection.commit()
     return total_points
 
-def insertNewUserIfNotExists(id:int):
+async def insertNewUserIfNotExists(id:int):
     cursor.execute("SELECT * FROM users WHERE id=?",(id,))
     if(cursor.fetchone() is None):        
         cursor.execute("INSERT INTO users VALUES(?,?)",(id,0))
@@ -110,7 +109,7 @@ async def getPoints(id:int):
     points = cursor.fetchone()
     return points[0]
 
-def updatePoints(id:int, change:int):
+async def updatePoints(id:int, change:int):
     cursor.execute("SELECT points FROM users WHERE id=?",(id,))
     points = cursor.fetchone()[0]
     points += change
@@ -126,7 +125,7 @@ async def transferFromHouse(targetId:int, transferAmount:int):
         updatePoints(houseId, transferAmount*-1)
     updatePoints(targetId, transferAmount)
 
-def transferPoints(sourceId:int, targetId:int, transferAmount:int):
+async def transferPoints(sourceId:int, targetId:int, transferAmount:int):
     if (transferAmount<0):
         return "Error, transfer amount must be greater than or equal to zero"
     elif (getPoints(sourceId)<transferAmount):

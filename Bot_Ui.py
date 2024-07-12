@@ -22,7 +22,10 @@ async def interactionReplyMenu(orgInteraction, curInteraction):
 
 async def editMenu(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):
     embed.set_thumbnail(url=user.avatar.url)
-    embed.add_field(name="", value="**Click a button below to go to that section**")
+    embed.add_field(name="Menu", value="Click a button below to go to that section")
+    userPoints = await db.getPoints(user.id)
+    embed.add_field(name="Points", value="You have "+str(userPoints)+" points", inline=False)
+    view.add_item(dailyButton(interaction))
     view.add_item(claimQuestsButton(interaction, "Quest"))
     view.add_item(coinFlipButton(interaction, 0))
     
@@ -39,25 +42,32 @@ class claimQuestsButton(Button):
         super().__init__(label=label, style=discord.ButtonStyle.blurple)
         self.interaction = interaction
     async def callback(self,interaction:discord.Interaction):
-        pointsGained = db.claimQuests(interaction.user.id)
+        pointsGained = await db.claimQuests(interaction.user.id)
         user = interaction.user
         embed = discord.Embed(title=user.display_name, color = user.color)
         view = View()
-        await editQuest(view, embed, user,interaction)
-        embed.add_field(name="Reward", value="You gained "+str(pointsGained)+" points")
+        await editQuest(view, embed, user, self.interaction)
+        embed.add_field(name="Reward", value="You gained "+str(pointsGained)+" points", inline=False)
         await self.interaction.edit_original_response(view=view, embed=embed)
+        await interaction.response.defer()
 
 class getNewQuestsButton(Button):
     def __init__(self, interaction:discord.Interaction):
         super().__init__(label="Get New Quests", style=discord.ButtonStyle.blurple)
         self.interaction = interaction
     async def callback(self,interaction:discord.Interaction):
+        user = interaction.user
+        embed = discord.Embed(title=user.display_name, color = user.color)
+        view = View()
         if (await db.checkQuestCooldown(interaction.user.id)):
             await db.setNewQuets(interaction.user.id)
-            db.resetQuestCooldown(interaction.user.id)
-            await interactionReplyQuest(self.interaction, interaction)
+            await db.resetQuestCooldown(interaction.user.id)
+            await editQuest(view, embed, user, self.interaction)
         else:
-            await interactionReplyQuest(self.interaction, interaction, "Cooldown", "Wait until twomorrow to replace completed quests")
+            await editQuest(view, embed, user, self.interaction)
+            embed.add_field(name="Cooldown", value="Wait until twomorrow to replace completed quests", inline= False)
+        await self.interaction.edit_original_response(view=view, embed=embed)
+        await interaction.response.defer()
 
 async def interpretQuest(quest):
     msg = quests.get(quest["id"])
@@ -78,15 +88,6 @@ async def editQuest(view:discord.ui.View, embed:discord.Embed, user:discord.User
     view.add_item(backButton(interaction))
     view.add_item(claimQuestsButton(interaction, "Claim Quest"))
     view.add_item(getNewQuestsButton(interaction))
-    
-async def interactionReplyQuest(orgInteraction, curInteraction, extraName="", extraValue=""):
-    user = curInteraction.user
-    embed = discord.Embed(title=user.display_name, color = user.color)
-    view = View()
-    await editQuest(view, embed, user,orgInteraction)
-    if (not extraName=="" and not extraValue==""):
-        embed.add_field(name=extraName, value=extraValue)
-    await orgInteraction.edit_original_response(view=view, embed=embed)
     
 #coin_flip
 COINFLIP_OPTIONS = ["Heads", "Tails"]
@@ -140,3 +141,30 @@ async def editCoinFlip(view:discord.ui.View, embed:discord.Embed, user:discord.U
     view.add_item(backButton(interaction))
     view.add_item(flipCoinButton(interaction, bet, "Heads"))
     view.add_item(flipCoinButton(interaction, bet, "Tails"))
+    
+#daily
+class dailyButton(Button):
+    def __init__(self, interaction:discord.Interaction):
+        super().__init__(label="Daily", style=discord.ButtonStyle.blurple)
+        self.interaction = interaction
+    async def callback(self, interaction:discord.Interaction):
+        user = interaction.user
+        user = interaction.user
+        view = View()
+        embed = discord.Embed(title=user.display_name, color = user.color)
+        await editDaily(view, embed, user, self.interaction)
+        await self.interaction.edit_original_response(view=view, embed=embed)
+        await interaction.response.defer()
+
+async def editDaily(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):   
+    embed.set_thumbnail(url=user.avatar.url)
+    embed.add_field(name="Daily", value="Click below to claim a daily reward")
+    if (await db.checkDailyCooldown(user.id)):
+        await db.resetDailyCooldown(user.id)
+        points = random.randint(10,20)
+        await db.updatePoints(user.id, points)
+        embed.add_field(name="Reward", value="You recived "+str(points)+" points", inline=False)
+    else:
+        embed.add_field(name="Cooldown", value="Wait until twomorrow to claim your daily reward", inline=False)
+    view.add_item(backButton(interaction))
+    view.add_item(dailyButton(interaction))
