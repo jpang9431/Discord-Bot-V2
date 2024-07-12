@@ -2,6 +2,7 @@ import sqlite3
 import datetime
 import json
 import random 
+import datetime
 
 connection = sqlite3.connect("users.db")
 cursor = connection.cursor()
@@ -27,16 +28,16 @@ def resetDailyCooldown(id:int):
 
 async def checkDailyCooldown(id:int):
     cursor.execute("SELECT last_daily FROM cooldown WHERE id=?",(id,))
-    timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone(), format)).days
+    timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone()[0], format)).days
     return timeDifference>=1
 
 async def checkQuestCooldown(id:int):
     cursor.execute("SELECT last_quest FROM cooldown WHERE id=?",(id,))
-    timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone(), format)).days
+    timeDifference = (datetime.datetime.today() - datetime.datetime.strptime(cursor.fetchone()[0], format)).days
     return timeDifference>=1
 
 def resetQuestCooldown(id:int):
-    date = datetime.datetime.today.strftime(format)
+    date = datetime.datetime.today().strftime(format)
     cursor.execute("UPDATE cooldown SET last_quest=? WHERE id=?",(date,id))
     connection.commit()
     
@@ -74,11 +75,12 @@ def resetQuests(id:int):
     cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(getNewQuest(),getNewQuest(),getNewQuest(),id))
     connection.commit()
 
-def setNewQuets(id:int):
+async def setNewQuets(id:int):
     cursor.execute("SELECT quest1, quest2, quest3 FROM quests WHERE id=?",(id,))
-    quests = cursor.fetchone()
+    quests = list(cursor.fetchone())
     for i in range(len(quests)):
-        if (quests[i]=="None"):
+        quest = json.loads(quests[i])
+        if quest["progress"]>=quest["goal"]:
             quests[i] = getNewQuest()
     cursor.execute("UPDATE quests SET quest1 = ?, quest2 = ?, quest3 = ? WHERE id=?",(quests[0],quests[1],quests[2],id))
             
@@ -105,24 +107,24 @@ def insertNewUserIfNotExists(id:int):
 
 async def getPoints(id:int):
     cursor.execute("SELECT points FROM users WHERE id=?",(id,))
-    return cursor.fetchone()
+    points = cursor.fetchone()
+    return points[0]
 
 def updatePoints(id:int, change:int):
     cursor.execute("SELECT points FROM users WHERE id=?",(id,))
-    points = cursor.fetchone()
+    points = cursor.fetchone()[0]
     points += change
     cursor.execute("UPDATE users SET points = ? WHERE id=?",(points, id))
     connection.commit()
     return points
 
-def transferFromHouse(targetId:int, transferAmount:int):
-    housePoints = getPoints()
+async def transferFromHouse(targetId:int, transferAmount:int):
+    housePoints = await getPoints(houseId)
     if (housePoints<transferAmount):
         updatePoints(houseId, housePoints*-1)
-        updatePoints(targetId, transferAmount)
     else:
         updatePoints(houseId, transferAmount*-1)
-        updatePoints(targetId, transferAmount)
+    updatePoints(targetId, transferAmount)
 
 def transferPoints(sourceId:int, targetId:int, transferAmount:int):
     if (transferAmount<0):

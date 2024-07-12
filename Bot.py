@@ -1,11 +1,12 @@
 import json
 import Database as db
-from Outputs.menu import editMenu
-from Outputs.quest import editQuest
+from Bot_Ui import editMenu
+from Bot_Ui import editQuest
+from Bot_Ui import editCoinFlip
 import discord
 from discord.ext import commands
 from discord.ui import View
-
+from discord import app_commands
 
 secertFile = open("config.json")
 fileData = json.load(secertFile)
@@ -50,7 +51,18 @@ async def menu(interaction:discord.Interaction):
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
-    await editMenu(view, embed, user,interaction)
+    await editMenu(view, embed, user, interaction)
     await interaction.response.send_message(embed=embed, view=view)
-    
+
+@client.tree.command(name="coin_flip", description="Flip a coin to win some points")
+@app_commands.describe(bet="The amount you want to be must be >=0 and <= the number of points you have, if the bet is out of range it goes to the default of 0")
+async def coin_flip(interaction:discord.Interaction, bet:int):
+    userId = interaction.user.id
+    db.insertNewUserIfNotExists(userId)
+    user = interaction.user
+    embed = discord.Embed(title=user.display_name, color = user.color)
+    view = View()
+    await editCoinFlip(view, embed, user, interaction, bet)
+    await interaction.response.send_message(embed=embed, view=view)
+
 client.run(token)
