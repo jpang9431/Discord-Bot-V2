@@ -5,13 +5,13 @@ from Bot_Ui import editQuest
 from Bot_Ui import editDaily
 from Bot_Ui import edit_stock_market_view_and_embed
 from Bot_Ui import edit_stock_view_and_embed
+from Bot_Ui import edit_leaderboard
 import discord
 from discord.ext import commands
 from discord.ui import View
-from discord.ui import Select
-from discord.ui import TextInput
 from discord import app_commands
 import yfinance as yf
+import asyncio
 
 secertFile = open("config.json")
 fileData = json.load(secertFile)
@@ -19,15 +19,23 @@ fileData = json.load(secertFile)
 client = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 token = fileData["token"]
 
+async def updateLeaderBoardInterval():
+    while True:
+        await db.updateLeaderBoard()
+        await asyncio.sleep(3600)
+
 @client.event
 async def on_ready():
     db.createRepository()
+    await db.updateLeaderBoard()
     await client.tree.sync()
+    await updateLeaderBoardInterval()
+    
 
 async def add_guild(guild):
     for user in guild.members:
         if not user.bot:
-            await db.insertNewUserIfNotExists(user.id)
+            await db.insertNewUserIfNotExists(user.id, user.global_name)
         
 @client.event
 async def on_guild_join(guild):
@@ -41,7 +49,7 @@ async def add_new_users(interaction:discord.Interaction):
 @client.tree.command(name="quest", description="Check/Claim quest progress and get new quests")
 async def quest(interaction:discord.Interaction):
     userId = interaction.user.id
-    await db.insertNewUserIfNotExists(userId)
+    await db.insertNewUserIfNotExists(userId, interaction.user.global_name)
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
@@ -51,7 +59,7 @@ async def quest(interaction:discord.Interaction):
 @client.tree.command(name="menu", description="View the menu of options")
 async def menu(interaction:discord.Interaction):
     userId = interaction.user.id
-    await db.insertNewUserIfNotExists(userId)
+    await db.insertNewUserIfNotExists(userId, interaction.user.global_name)
     user = interaction.user
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
@@ -61,7 +69,7 @@ async def menu(interaction:discord.Interaction):
 @client.tree.command(name="daily", description="Claim daily reward")
 async def daily(interaction:discord.Interaction):
     user = interaction.user
-    await db.insertNewUserIfNotExists(user.id)
+    await db.insertNewUserIfNotExists(user.id, interaction.user.global_name)
     embed = discord.Embed(title=user.display_name, color = user.color)
     view = View()
     await editDaily(view, embed, user, interaction)
@@ -125,7 +133,7 @@ async def sell_stocks(interaction:discord.Interaction, ticker: str, amount: app_
         embed.add_field(name="Action Result", value="Sucessfully sold "+str(amount)+" of "+stock_ticker_info["shortName"], inline=False)
     else:
         embed.add_field(name="Action Result", value="Too few stocks own to sell", inline=False)
-    interaction.response.send_message(view=view, embed=embed)
+    await interaction.response.send_message(view=view, embed=embed)
 
 @client.tree.command(name="owned_stocks", description="View stocks owned")
 async def owned_stocks(interaction:discord.Interaction):
@@ -136,7 +144,19 @@ async def owned_stocks(interaction:discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view)
 
 
+@client.tree.command(name="update_leaderboard", description="Refresh leaderboard")
+@app_commands.checks.has_permissions(administrator=True)
+async def update_leaderboard(interaction:discord.Interaction):
+    await db.updateLeaderBoard()
+    user = interaction.user
+    view = View()
+    embed = discord.Embed(title=user.display_name, color = user.color)
+    await edit_leaderboard(view, embed, interaction.user, interaction)
+    await interaction.response.send_message(view=view, embed=embed)
 
-#double check that points are actually going out of user account
+@update_leaderboard.error
+async def update_leaderboard_error(interaction, error):
+    await interaction.response.send_message(content="You do not have the permission to update the leaderboard", ephemeral=True)
 
 client.run(token)
+

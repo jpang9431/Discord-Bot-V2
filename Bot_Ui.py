@@ -1,14 +1,10 @@
 import discord
 from discord.ui import Button
 from discord.ui import View
-from discord.ui import TextInput
-from discord.ui import Modal
-from discord import ui
-from discord import Embed
-from discord import Interaction
 import yfinance as yf
 import random
 import Database as db
+import json
 
 #menu
 class backButton(Button):
@@ -27,13 +23,16 @@ async def interactionReplyMenu(orgInteraction, curInteraction):
     await curInteraction.response.defer()
 
 async def editMenu(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):
-    embed.set_thumbnail(url=user.avatar.url)
+    if (not user.avatar == None):
+        embed.set_thumbnail(url=user.avatar.url)
+    data = await db.getUserData(user.id)
     embed.add_field(name="Menu", value="Click a button below to go to that section")
-    userPoints = await db.getPoints(user.id)
-    embed.add_field(name="Points", value="You have "+str(userPoints)+" points", inline=False)
+    embed.add_field(name="User Stats", value="Position: "+str(data[0])+"\nTotal: "+str(data[2])+"\nPoints: "+str(data[3])+"\nStocks: "+str(data[4]),inline=False)
+    embed.set_footer(text="*Position and stock last updated: "+str(await db.getLastUpdate()))
     view.add_item(dailyButton(interaction))
     view.add_item(claimQuestsButton(interaction, "Quest")) 
-    view.add_item(refreshStocks(interaction, "View Stocks"))
+    view.add_item(refreshStocks(interaction, "Stocks"))
+    view.add_item(refreshLeaderboard(interaction, "Leader Board"))
     
 #quest
 quests = {
@@ -113,7 +112,8 @@ async def interpretQuest(quest):
     return msg +"\n"
 
 async def editQuest(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction):
-    embed.set_thumbnail(url=user.avatar.url)
+    if (not user.avatar == None):
+        embed.set_thumbnail(url=user.avatar.url)
     questList = await db.getQuests(user.id)
     textQuests = ""
     for quest in questList:
@@ -139,7 +139,8 @@ class dailyButton(Button):
         await interaction.response.defer()
 
 async def editDaily(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):   
-    embed.set_thumbnail(url=user.avatar.url)
+    if (not user.avatar == None):
+        embed.set_thumbnail(url=user.avatar.url)
     embed.add_field(name="Daily", value="Click below to claim a daily reward")
     if (await db.checkDailyCooldown(user.id)):
         await db.resetDailyCooldown(user.id)
@@ -238,9 +239,43 @@ class refreshStocks(Button):
 async def edit_stock_view_and_embed(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):
     data = await db.getStocks(user.id)
     msg = ""
+    totalStockValue = 0
     for key, value in data.items():
         info = yf.Ticker(key).info
         msg += info["shortName"]+" ("+key+") | Amount: "+str(value)+" | Value: "+str(value*info["bid"])+"\n"
+        totalStockValue += value*info["bid"]
+    await db.setStockValue(user.id, totalStockValue)
     embed.add_field(name="Owned Stocks", value=msg)
+    if (not user.avatar == None):
+        embed.set_thumbnail(url=user.avatar.url)
     view.add_item(backButton(interaction))
     view.add_item(refreshStocks(interaction, "Refresh Stocks"))
+
+class refreshLeaderboard(Button):
+    def __init__(self, interaction:discord.Interaction, label:str):
+        super().__init__(label=label, style=discord.ButtonStyle.blurple)
+        self.interaction = interaction
+    async def callback(self, interaction:discord.Interaction):   
+        user = interaction.user
+        view = View()
+        embed = discord.Embed(title=user.display_name, color=user.color)
+        await edit_leaderboard(view,embed,user,interaction)
+        await self.interaction.edit_original_response(view=view, embed=embed)
+        await interaction.response.defer()
+    
+async def edit_leaderboard(view:discord.ui.View, embed:discord.Embed, user:discord.User, interaction:discord.Interaction):
+    leaderboard = json.loads(await db.getLeaderBoard())
+    userData = await db.getUserData(user.id)
+    lastUpdate = await db.getLastUpdate()
+    if (not user.avatar == None):
+        embed.set_thumbnail(url=user.avatar.url)
+    embed.add_field(name="Username and Total", value=leaderboard[0]+"\n"+str(userData[0])+"."+userData[1])
+    embed.add_field(name="Total", value=leaderboard[1]+"\n"+str(userData[2]))
+    embed.add_field(name="Points|Stocks", value=leaderboard[2]+"\n"+str(userData[3])+"|"+str(userData[4]))
+    embed.set_footer(text="Last Updated: "+lastUpdate)
+    view.add_item(backButton(interaction))
+    view.add_item(refreshLeaderboard(interaction,"Refresh Leaderboard"))
+    
+    
+  
+        

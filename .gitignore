@@ -3,3 +3,5 @@ config.json
 __pychace__
 __pycache__/Bot_Ui.cpython-312.pyc
 __pycache__/Database.cpython-312.pyc
+__pycache__/GlobalDatabase.cpython-312.pyc
+global.db
