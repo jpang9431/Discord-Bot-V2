@@ -31,7 +31,7 @@ questDict = {
     "Buy Stock" : 2
 }
 
-cooldown_bypass = True
+cooldown_bypass = False
 
 globalCursor = globalConnection.cursor()
 
